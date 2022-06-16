@@ -15,8 +15,6 @@ begin
 end
 
 begin
-    using ArchGDAL
-    const AG = ArchGDAL
     using FileIO
     using NPZ
     using DelimitedFiles
