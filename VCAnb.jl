@@ -35,8 +35,6 @@ end
 
 # ╔═╡ 08fc6aaf-5894-4bee-baaf-f24d10752173
 begin
-	using ArchGDAL
-	const AG = ArchGDAL
 	using FileIO
 	using NPZ
 	using DelimitedFiles
