@@ -43,7 +43,7 @@ end
 
 # ╔═╡ 99cf8901-2fd2-4011-bc44-d5528ee876a0
 md"""
-The graph above shows the spectra of 9 end-members detected using the VCA algorihtm on Hyperion Dataset.
+The graph above shows the spectra of 9 end-members detected using the VCA algorihtm on Hyperion Data.
 """
 
 # ╔═╡ 4be606c7-7f79-4155-99ab-f5aca921c3ef
@@ -60,9 +60,6 @@ Then the VCA algorithm is run to find out the said EMs.
 
 The graph on the below right shows the endmembers extracted using VCA.
 """
-
-# ╔═╡ 88174827-db9c-4a46-a2da-aa4b6c7413c6
-@bind ems Slider(1:10)
 
 # ╔═╡ 2e5701d1-1604-4730-8467-9fa969b689df
 md"""
@@ -248,7 +245,7 @@ end
 # ╔═╡ 1c659856-b4f1-450f-a452-79756c7856dc
 begin
 	Model = VCA(X, 9, 0.0);
-	plot(SelectedBands[1:130],Model[1][:,:], shape=:vline, mc=:red, ms=:2)
+	plot(SelectedBands[1:130],Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
 end
 
 # ╔═╡ 5b864cbf-6c05-4147-9ea9-aeb5b5903ad0
@@ -259,13 +256,16 @@ begin
 	madeupspectras = map(x -> x/norm(x), map(x -> x .- minimum(x), madeupspectras))
 	
 	TMod = VCA(madeupimage, length(madeupspectras), 0.0);
-	estspectra = [TMod[1][:,i] for i=1:10]
+	estspectra = [TMod[1][:,i] for i=1:length(madeupspectras)]
 	estspectra = map(x -> x/norm(x), map(x -> x .- minimum(x), estspectra))
 	
 	pt1 = plot(madeupspectras; shape=:vline, mc=:red, ms=:2, layout=(length(madeupspectras),1), legend=false, colorbar=false, showaxis=false, ticks=false, size=(1920,1080))
 	pt2 = plot(estspectra; shape=:vline, mc=:red, ms=:2, layout=(length(madeupspectras),1), legend=false, colorbar=false, showaxis=false, ticks=false, size=(1920,1080))
 	plot(pt1,pt2, layout=(1,2), size=(1920,1080))
 end
+
+# ╔═╡ 88174827-db9c-4a46-a2da-aa4b6c7413c6
+@bind ems Slider(1:length(madeupspectras))
 
 # ╔═╡ 314ccaa3-7905-42fa-9146-2e2fab69fd41
 begin
@@ -332,7 +332,7 @@ md"""
 #=╠═╡
 begin
 	Y = X
-	R = 10
+	R = 3
 	SNRin = 0
 	L,N, = size(Y)
 
@@ -398,7 +398,6 @@ end
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
-ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
@@ -415,7 +414,6 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
-ArchGDAL = "~0.9.0"
 Colors = "~0.12.8"
 FileIO = "~1.14.0"
 ImageIO = "~0.5.9"
@@ -432,7 +430,7 @@ PlutoUI = "~0.7.39"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.7.2"
+julia_version = "1.7.3"
 manifest_format = "2.0"
 
 [[deps.AbstractFFTs]]
@@ -452,12 +450,6 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "af92965fb30777147966f58acb05da51c5616b5f"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 version = "3.3.3"
-
-[[deps.ArchGDAL]]
-deps = ["CEnum", "ColorTypes", "Dates", "DiskArrays", "Extents", "GDAL", "GeoFormatTypes", "GeoInterface", "GeoInterfaceRecipes", "ImageCore", "Tables"]
-git-tree-sha1 = "f5592638035b4709a42a9b27e31c13309be80eb9"
-uuid = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
-version = "0.9.0"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -613,12 +605,6 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
-[[deps.DiskArrays]]
-deps = ["OffsetArrays"]
-git-tree-sha1 = "230d999fc78652ea070312373ed1bfe2489e4fe5"
-uuid = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
-version = "0.3.6"
-
 [[deps.Distances]]
 deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
 git-tree-sha1 = "3258d0659f812acde79e8a74b11f17ac06d0ca04"
@@ -636,7 +622,7 @@ uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 version = "0.8.6"
 
 [[deps.Downloads]]
-deps = ["ArgTools", "LibCURL", "NetworkOptions"]
+deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 
 [[deps.DualNumbers]]
@@ -656,11 +642,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.4.8+0"
-
-[[deps.Extents]]
-git-tree-sha1 = "a087a23129ac079d43ba6b534c6350325fcd41c9"
-uuid = "411431e0-e8b7-467b-b5e0-f676ba4f2910"
-version = "0.1.0"
 
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
@@ -698,6 +679,9 @@ git-tree-sha1 = "9267e5f50b0e12fdfd5a2455534345c4cf2c7f7a"
 uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 version = "1.14.0"
 
+[[deps.FileWatching]]
+uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
+
 [[deps.FixedPointNumbers]]
 deps = ["Statistics"]
 git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
@@ -728,24 +712,6 @@ git-tree-sha1 = "aa31987c2ba8704e23c6c8ba8a4f769d5d7e4f91"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.10+0"
 
-[[deps.GDAL]]
-deps = ["CEnum", "GDAL_jll", "NetworkOptions", "PROJ_jll"]
-git-tree-sha1 = "9ce70502472a9f23f8889f0f9e2be8451413fe7b"
-uuid = "add2ef01-049f-52c4-9ee2-e494f65e021a"
-version = "1.4.0"
-
-[[deps.GDAL_jll]]
-deps = ["Artifacts", "Expat_jll", "GEOS_jll", "JLLWrappers", "LibCURL_jll", "Libdl", "Libtiff_jll", "OpenJpeg_jll", "PROJ_jll", "Pkg", "SQLite_jll", "Zlib_jll", "Zstd_jll", "libgeotiff_jll"]
-git-tree-sha1 = "756a15a73ded80cf194e7458abeb6f559d5070e2"
-uuid = "a7073274-a066-55f0-b90d-d619367d196c"
-version = "300.500.0+1"
-
-[[deps.GEOS_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
-git-tree-sha1 = "4ceb4cdae127931b852ced4d3782bb51ab5e2632"
-uuid = "d604d12d-fa86-5845-992e-78dc15976526"
-version = "3.10.2+0"
-
 [[deps.GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pkg", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll"]
 git-tree-sha1 = "51d2dfe8e590fbd74e7a842cf6d13d8a2f45dc01"
@@ -763,23 +729,6 @@ deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "
 git-tree-sha1 = "1e5490a51b4e9d07e8b04836f6008f46b48aaa87"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
 version = "0.64.3+0"
-
-[[deps.GeoFormatTypes]]
-git-tree-sha1 = "434166198434a5c2fcc0a1a59d22c3b0ad460889"
-uuid = "68eda718-8dee-11e9-39e7-89f7f65f511f"
-version = "0.4.1"
-
-[[deps.GeoInterface]]
-deps = ["Extents"]
-git-tree-sha1 = "de6980e052d67c0da1872dfdb2c49fb7d3f56b07"
-uuid = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
-version = "1.0.0"
-
-[[deps.GeoInterfaceRecipes]]
-deps = ["GeoInterface", "RecipesBase"]
-git-tree-sha1 = "29e1ec25cfb6762f503a19495aec347acf867a9e"
-uuid = "0329782f-3d07-4b52-b9f6-d3137cf03c7a"
-version = "1.0.0"
 
 [[deps.GeometryBasics]]
 deps = ["EarCut_jll", "IterTools", "LinearAlgebra", "StaticArrays", "StructArrays", "Tables"]
@@ -1134,12 +1083,6 @@ version = "2.36.0+0"
 deps = ["Libdl", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
-[[deps.LittleCMS_jll]]
-deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pkg"]
-git-tree-sha1 = "110897e7db2d6836be22c18bffd9422218ee6284"
-uuid = "d3a379c0-f9a3-5b72-a4c0-6bf4d2e8af0f"
-version = "2.12.0+0"
-
 [[deps.LogExpFunctions]]
 deps = ["ChainRulesCore", "ChangesOfVariables", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
 git-tree-sha1 = "09e4b894ce6a976c354a69041a04748180d43637"
@@ -1257,12 +1200,6 @@ git-tree-sha1 = "923319661e9a22712f24596ce81c54fc0366f304"
 uuid = "18a262bb-aa17-5467-a713-aee519bc75cb"
 version = "3.1.1+0"
 
-[[deps.OpenJpeg_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Libtiff_jll", "LittleCMS_jll", "Pkg", "libpng_jll"]
-git-tree-sha1 = "76374b6e7f632c130e78100b166e5a48464256f8"
-uuid = "643b3616-a352-519d-856d-80112ee9badc"
-version = "2.4.0+0"
-
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
@@ -1301,12 +1238,6 @@ deps = ["Base64", "CEnum", "ImageCore", "IndirectArrays", "OffsetArrays", "libpn
 git-tree-sha1 = "e925a64b8585aa9f4e3047b8d2cdc3f0e79fd4e4"
 uuid = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
 version = "0.3.16"
-
-[[deps.PROJ_jll]]
-deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "Libtiff_jll", "Pkg", "SQLite_jll"]
-git-tree-sha1 = "12bd68665a0c3cb4635c4359d3fa9e2769ed59e5"
-uuid = "58948b4f-47e0-5654-a9ad-f609743f8632"
-version = "900.0.0+0"
 
 [[deps.PaddedViews]]
 deps = ["OffsetArrays"]
@@ -1449,12 +1380,6 @@ version = "1.3.1"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
-
-[[deps.SQLite_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
-git-tree-sha1 = "b6d006c4c57278d532de38912e16adf626c949c7"
-uuid = "76ed43ae-9a5d-5a62-8c75-30186b810ce8"
-version = "3.38.4+0"
 
 [[deps.Scratch]]
 deps = ["Dates"]
@@ -1803,12 +1728,6 @@ git-tree-sha1 = "daacc84a041563f965be61859a36e17c4e4fcd55"
 uuid = "f638f0a6-7fb0-5443-88ba-1cc74229b280"
 version = "2.0.2+0"
 
-[[deps.libgeotiff_jll]]
-deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "Libtiff_jll", "PROJ_jll", "Pkg"]
-git-tree-sha1 = "e51bca193c8a4774dc1d2e5d40d5c4491c1b4fd4"
-uuid = "06c338fa-64ff-565b-ac2f-249532af990e"
-version = "1.7.1+0"
-
 [[deps.libpng_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
 git-tree-sha1 = "94d180a6d2b5e55e447e2d27a29ed04fe79eb30c"
@@ -1866,13 +1785,13 @@ version = "0.9.1+5"
 # ╟─853edae3-22ba-4fe6-818a-34a5ac005675
 # ╟─ccf2ec98-c9d9-4c73-9395-9ec804e52bcd
 # ╟─7cde3546-5913-46ed-a044-3f9cc7177cee
-# ╟─af3de22f-4801-432a-9329-832a851ad176
+# ╠═af3de22f-4801-432a-9329-832a851ad176
 # ╟─4262fd8d-dca8-4ea9-8850-caed586da9d2
 # ╟─c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
-# ╟─2f671849-a72d-4c54-b977-afa32a0f035c
-# ╟─4061c376-dc7c-490e-a607-9d55ad8f05f3
-# ╟─e4305ce2-6a7a-4091-b209-d794f6d8dc56
-# ╟─08fc6aaf-5894-4bee-baaf-f24d10752173
+# ╠═2f671849-a72d-4c54-b977-afa32a0f035c
+# ╠═4061c376-dc7c-490e-a607-9d55ad8f05f3
+# ╠═e4305ce2-6a7a-4091-b209-d794f6d8dc56
+# ╠═08fc6aaf-5894-4bee-baaf-f24d10752173
 # ╟─a5516e71-e71f-47c6-b0e9-24af4c188f2b
 # ╟─e6d7074d-2b20-415c-8005-31ec6b0387d7
 # ╟─00000000-0000-0000-0000-000000000001
