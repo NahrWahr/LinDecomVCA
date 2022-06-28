@@ -39,7 +39,11 @@ begin
 	using NPZ
 	using DelimitedFiles
 	using JLD2
+	using JSON
 end
+
+# ╔═╡ 8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
+@bind n Slider(1:9)
 
 # ╔═╡ 99cf8901-2fd2-4011-bc44-d5528ee876a0
 md"""
@@ -248,6 +252,37 @@ begin
 	plot(SelectedBands[1:130],Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
 end
 
+# ╔═╡ 25476048-94e9-4b3f-9fa7-a8699d95ec63
+begin
+	sm = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Samples.json")
+	HypObs = map(x -> x/norm(x), map(x -> x .- minimum(x), [Model[1][:,i] for i =1:9]))
+	MaterialSpec = last.(load("/home/rnarwar/Desktop/EcoStressNumPy/SelectedSpectra.jld2", "Out"))
+	MaterialSpec = map(x -> x/norm(x), map(x -> x .- minimum(x), MaterialSpec))
+	for i in eachindex(MaterialSpec)
+		if reduce(|, isnan.(MaterialSpec[i]))
+			MaterialSpec[i] .= 0
+		end
+	end
+	MaterialSpec
+end
+
+# ╔═╡ a9a58df3-d24b-48cc-841d-608053a6336c
+begin
+	materialmatch = Vector{Int32}(undef,9)
+	j = 1
+	for sp in HypObs
+		diff = Vector{Float32}(undef,length(MaterialSpec))
+		for i in eachindex(MaterialSpec)
+			diff[i] = norm(MaterialSpec[i][1:130] - sp)
+		end
+		materialmatch[j]=last(findmin(diff))
+		j+=1
+	end
+end
+
+# ╔═╡ 2bde76cc-f998-431b-80e1-426f590b8171
+println(get(sm[materialmatch[n]], "Type", 1));plot(HypObs[n],label="EM Capured $n");plot!(MaterialSpec[materialmatch[n]][1:130],label=get(sm[materialmatch[n]], "Name", 1))
+
 # ╔═╡ 5b864cbf-6c05-4147-9ea9-aeb5b5903ad0
 begin
 	madeupimage = permutedims(load("/home/rnarwar/Pixxel/project/testdata/FabricatedDataCube/FlatImage.jld2", "madeupimage")) .+ 0.3randn(200,40000);
@@ -405,6 +440,7 @@ ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
 ImageShow = "4e3cecfd-b093-5904-9786-8bbb286a6a31"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 MultivariateStats = "6f286f6a-111f-5878-ab1e-185364afe411"
 NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
@@ -420,6 +456,7 @@ ImageIO = "~0.5.9"
 ImageShow = "~0.3.1"
 Images = "~0.24.1"
 JLD2 = "~0.4.22"
+JSON = "~0.21.3"
 MultivariateStats = "~0.9.1"
 NPZ = "~0.4.2"
 Plots = "~1.29.1"
@@ -1769,6 +1806,8 @@ version = "0.9.1+5"
 
 # ╔═╡ Cell order:
 # ╟─1c659856-b4f1-450f-a452-79756c7856dc
+# ╟─2bde76cc-f998-431b-80e1-426f590b8171
+# ╟─8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
 # ╟─99cf8901-2fd2-4011-bc44-d5528ee876a0
 # ╟─b135e9fa-6623-49b8-84d6-f866ed762e99
 # ╟─4be606c7-7f79-4155-99ab-f5aca921c3ef
@@ -1776,6 +1815,8 @@ version = "0.9.1+5"
 # ╟─5b864cbf-6c05-4147-9ea9-aeb5b5903ad0
 # ╟─d1768854-2b0b-41f7-bfcc-d258f6a046df
 # ╟─88174827-db9c-4a46-a2da-aa4b6c7413c6
+# ╟─25476048-94e9-4b3f-9fa7-a8699d95ec63
+# ╟─a9a58df3-d24b-48cc-841d-608053a6336c
 # ╟─2e5701d1-1604-4730-8467-9fa969b689df
 # ╟─9edc2aeb-ea98-48fe-9d48-a09e13f8fc12
 # ╟─515f63b3-f3bd-4ed9-9529-de98b83a298f
@@ -1785,7 +1826,7 @@ version = "0.9.1+5"
 # ╟─853edae3-22ba-4fe6-818a-34a5ac005675
 # ╟─ccf2ec98-c9d9-4c73-9395-9ec804e52bcd
 # ╟─7cde3546-5913-46ed-a044-3f9cc7177cee
-# ╠═af3de22f-4801-432a-9329-832a851ad176
+# ╟─af3de22f-4801-432a-9329-832a851ad176
 # ╟─4262fd8d-dca8-4ea9-8850-caed586da9d2
 # ╟─c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
 # ╠═2f671849-a72d-4c54-b977-afa32a0f035c
