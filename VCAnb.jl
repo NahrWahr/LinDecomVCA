@@ -42,16 +42,10 @@ begin
 	using JSON
 end
 
-# ╔═╡ 8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
-@bind n Slider(1:9)
-
 # ╔═╡ 99cf8901-2fd2-4011-bc44-d5528ee876a0
 md"""
 The graph above shows the spectra of 9 end-members detected using the VCA algorihtm on Hyperion Data.
 """
-
-# ╔═╡ 4be606c7-7f79-4155-99ab-f5aca921c3ef
-@bind ImageSelect Slider(1:3)
 
 # ╔═╡ 71261f87-c992-441b-a172-163b832e19c2
 md"""
@@ -248,14 +242,21 @@ end
 
 # ╔═╡ 1c659856-b4f1-450f-a452-79756c7856dc
 begin
-	Model = VCA(X, 9, 0.0);
+	NoEM2Extract = 15
+	Model = VCA(X, NoEM2Extract, 0.0);
 	plot(SelectedBands[1:130],Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
 end
+
+# ╔═╡ 8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
+@bind n Slider(1:NoEM2Extract)
+
+# ╔═╡ 4be606c7-7f79-4155-99ab-f5aca921c3ef
+@bind ImageSelect Slider(1:NoEM2Extract÷3)
 
 # ╔═╡ 25476048-94e9-4b3f-9fa7-a8699d95ec63
 begin
 	sm = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Samples.json")
-	HypObs = map(x -> x/norm(x), map(x -> x .- minimum(x), [Model[1][:,i] for i =1:9]))
+	HypObs = map(x -> x/norm(x), map(x -> x .- minimum(x), [Model[1][:,i] for i =1:NoEM2Extract]))
 	MaterialSpec = last.(load("/home/rnarwar/Desktop/EcoStressNumPy/SelectedSpectra.jld2", "Out"))
 	MaterialSpec = map(x -> x/norm(x), map(x -> x .- minimum(x), MaterialSpec))
 	for i in eachindex(MaterialSpec)
@@ -268,7 +269,7 @@ end
 
 # ╔═╡ a9a58df3-d24b-48cc-841d-608053a6336c
 begin
-	materialmatch = Vector{Int32}(undef,9)
+	materialmatch = Vector{Int32}(undef,NoEM2Extract)
 	j = 1
 	for sp in HypObs
 		diff = Vector{Float32}(undef,length(MaterialSpec))
