@@ -40,50 +40,98 @@ begin
 	using DelimitedFiles
 	using JLD2
 	using JSON
+	using Base64
+	using ArchGDAL
+	const AG = ArchGDAL
 end
 
-# ╔═╡ 99cf8901-2fd2-4011-bc44-d5528ee876a0
+# ╔═╡ e626b16c-2a51-4ecb-aa85-852e34614181
 md"""
-The graph above shows the spectra of 9 end-members detected using the VCA algorihtm on Hyperion Data.
+# Loading and pre-processing Data
 """
 
-# ╔═╡ 71261f87-c992-441b-a172-163b832e19c2
-md"""
-The made up Image is fabricated using a set of randomly generated EMS.
-The graph below on the left shows the pure endmembers which we know with certainty.
+# ╔═╡ 91dc3a4b-01f5-4959-9ef8-ea0895e3b765
+struct IPixel
+	Ind::CartesianIndex
+	Vec::Vector{UInt8}
+end
 
-We then proceed to mix these end-members in an array and apply varying light intensity multipliers to simulate the affect of slope and sunlight along with Gaussian noise.
+# ╔═╡ 8272fcc9-2118-4088-b339-571a231f49a3
+function Discard0(X::Matrix{IPixel})::Tuple{Vector{CartesianIndex}, Matrix{UInt8}}
+	n = size(X,1)
+	Out = Vector{Vector{UInt8}}(undef,0)
+	Index = Vector{CartesianIndex{2}}(undef,0)
+	for i in 1:n
+		if sum(X[i].Vec) != 0
+			push!(Out, X[i].Vec)
+			push!(Index, X[i].Ind)
+		end
+	end
+	Out = permutedims(hcat(Out...))
+	return Index,Out
+end
 
-Then the VCA algorithm is run to find out the said EMs.
+# ╔═╡ 64feecf9-5231-404e-9346-0cc0548dc356
+function IndexFlat(Data::Array{UInt8, 3})::Matrix{IPixel}
+	a,b,c = size(Data)
+	A = Vector{IPixel}(undef,0)
+	for i=1:a
+		for j=1:b
+			push!(A, IPixel(CartesianIndex(i,j), Data[i,j,:]))
+		end
+	end
+	A = permutedims(hcat(A...))
+	return A
+end
 
-The graph on the below right shows the endmembers extracted using VCA.
-"""
+# ╔═╡ 0eca535c-9779-49a1-90b3-a79247e62de5
+function LoadData()::Tuple{Matrix{UInt8}, Vector{CartesianIndex}}
+	X, Index = load("/home/rnarwar/Pixxel/project/testdata/IndARD.jld2", "Data", "Index")
+	return X, Index
+end
 
-# ╔═╡ 2e5701d1-1604-4730-8467-9fa969b689df
-md"""
-## THE END
-"""
+# ╔═╡ da3c2c91-2b67-44a6-aa7b-86819d941367
+function LoadTIF()::Array{UInt8}
+	Data = AG.readraster("/home/rnarwar/Pixxel/project/testdata/Hyperion_Canada.tif")
+	Data = Data[:,:,setdiff(1:end, (88:108),(131:158))]; # discard 88:108 131:158
+	return Data
+end
 
-# ╔═╡ 9edc2aeb-ea98-48fe-9d48-a09e13f8fc12
-html"<br><br><br><br><br><br><br><br><br><br><br><br><br><br>"
+# ╔═╡ c3e5a89c-1994-48b2-95bd-4a08b6c43c30
+function Discard0(X::Matrix)
+	Out = []
+	for i in 1:size(X,1)
+		if sum(X[i,:]) != 0
+			push!(Out, X[i,:])
+		end
+	end
+	Out = permutedims(hcat(Out...))
+	return Out
+end
+
+# ╔═╡ 6f2ee555-bfee-4caf-8ef5-bdabf924b888
+function Flatten(Data::Array)::Matrix
+	a,b,c =size(Data)
+	Out = reshape(Data, a*b, c)
+	return Out
+end
 
 # ╔═╡ 8c810275-ea32-44c4-9bfb-20108f861159
 begin
 	hyperion_bands = [426.82, 436.99, 447.17, 457.34, 467.52, 477.69, 487.87, 498.04, 508.22, 518.39, 528.57, 538.74, 548.92, 559.09, 569.27, 579.45, 589.62, 599.8, 609.97, 620.15, 630.32, 640.5, 650.67, 660.85, 671.02, 681.2, 691.37, 701.55, 711.72, 721.9, 732.07, 742.25, 752.43, 762.6, 772.78, 782.95, 793.13, 803.3, 813.48, 823.65, 833.83, 844.0, 854.18, 864.35, 874.53, 884.7, 894.88, 905.05, 915.23, 922.54, 932.64, 942.73, 952.82, 962.91, 972.99, 983.08, 993.17, 1003.3, 1013.3, 1023.4, 1033.49, 1043.59, 1053.69, 1063.79, 1073.89, 1083.99, 1094.09, 1104.19, 1114.19, 1124.28, 1134.38, 1144.48, 1154.58, 1164.68, 1174.77, 1184.87, 1194.97, 1205.07, 1215.17, 1225.17, 1235.27, 1245.36, 1255.46, 1265.56, 1275.66, 1285.76, 1295.86, 1305.96, 1316.05, 1326.05, 1336.15, 1346.25, 1356.35, 1366.45, 1376.55, 1386.65, 1396.74, 1406.84, 1416.94, 1426.94, 1437.04, 1447.14, 1457.23, 1467.33, 1477.43, 1487.53, 1497.63, 1507.73, 1517.83, 1527.92, 1537.92, 1548.02, 1558.12, 1568.22, 1578.32, 1588.42, 1598.51, 1608.61, 1618.71, 1628.81, 1638.81, 1648.9, 1659.0, 1669.1, 1679.2, 1689.3, 1699.4, 1709.5, 1719.6, 1729.7, 1739.7, 1749.79, 1759.89, 1769.99, 1780.09, 1790.19, 1800.29, 1810.38, 1820.48, 1830.58, 1840.58, 1850.68, 1860.78, 1870.87, 1880.98, 1891.07, 1901.17, 1911.27, 1921.37, 1931.47, 1941.57, 1951.57, 1961.66, 1971.76, 1981.86, 1991.96, 2002.06, 2012.15, 2022.25, 2032.35, 2042.45, 2052.45, 2062.55, 2072.65, 2082.75, 2092.84, 2102.94, 2113.04, 2123.14, 2133.24, 2143.34, 2153.34, 2163.43, 2173.53, 2183.63, 2193.73, 2203.83, 2213.93, 2224.03, 2234.12, 2244.22, 2254.22, 2264.32, 2274.42, 2284.52, 2294.61, 2304.71, 2314.81, 2324.91, 2335.01, 2345.11, 2355.21, 2365.2, 2375.3, 2385.4, 2395.5]
-	SelectedBands = (hyperion_bands[setdiff(1:end, (88:108),(131:158))])
+	SelectedBands = (hyperion_bands[setdiff(1:end, (88:108),(131:158))]) * 1e-3
 end
 
 # ╔═╡ 853edae3-22ba-4fe6-818a-34a5ac005675
 begin
 	X, Index = load("/home/rnarwar/Pixxel/project/testdata/IndARD.jld2", "Data", "Index")
+	#Index, X = Discard0(IndexFlat(LoadTIF()[:,100:end-100,:]))
 	X = permutedims(X[:, 1:130])
 end
 
-# ╔═╡ ccf2ec98-c9d9-4c73-9395-9ec804e52bcd
+# ╔═╡ fce4a1d4-dc42-48ca-886c-37af467e870e
 md"""
----
----
----
+# Running VCA on dataset
 """
 
 # ╔═╡ 7cde3546-5913-46ed-a044-3f9cc7177cee
@@ -250,15 +298,56 @@ end
 # ╔═╡ 8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
 @bind n Slider(1:NoEM2Extract)
 
-# ╔═╡ 4be606c7-7f79-4155-99ab-f5aca921c3ef
-@bind ImageSelect Slider(1:NoEM2Extract÷3)
+# ╔═╡ 99cf8901-2fd2-4011-bc44-d5528ee876a0
+md"""
+The graph above shows the spectra of 9 end-members detected using the VCA algorihtm on Hyperion Data.
+"""
+
+# ╔═╡ 0a81aa25-a572-4223-b7d0-5f12f333b360
+md"""
+# Identifying EMs with Material
+"""
+
+# ╔═╡ 1515fcc7-8cc3-4e76-91df-3da892baebab
+function BandMatch(x::Vector{Float32})::Vector{Int32}
+	CorresBand = Vector{Int32}(undef, length(SelectedBands))
+	for i in eachindex(SelectedBands)
+		Band = findmin(abs.(x .- SelectedBands[i]))
+		if first(Band) < 0.01
+			CorresBand[i] = last(Band)
+		else
+			return ones(length(SelectedBands))
+			break
+		end
+	end
+	return CorresBand
+end
+
+# ╔═╡ 67b54389-bb16-4aff-ac9c-a0af1b6862ea
+function SelectSpectra(sp)
+	n = length(sp)
+	Spectra = []
+	for sno=1:n
+		x,y, = Vector.(map(x->reinterpret(Float32, base64decode(x)),(get(sp[sno],"XData",1),get(sp[sno],"YData",1))))
+		CBand = BandMatch(x)
+		push!(Spectra, [x[CBand],y[CBand]])
+	end
+	return Spectra
+end
 
 # ╔═╡ 25476048-94e9-4b3f-9fa7-a8699d95ec63
 begin
 	sm = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Samples.json")
+	
+	sp = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Spectra.json")
+	
 	HypObs = map(x -> x/norm(x), map(x -> x .- minimum(x), [Model[1][:,i] for i =1:NoEM2Extract]))
-	MaterialSpec = last.(load("/home/rnarwar/Desktop/EcoStressNumPy/SelectedSpectra.jld2", "Out"))
+	
+	MaterialSpec = SelectSpectra(sp)
+	#load("/home/rnarwar/Desktop/EcoStressNumPy/SelectedSpectra.jld2", "Out")
+	MaterialSpec = last.(MaterialSpec)
 	MaterialSpec = map(x -> x/norm(x), map(x -> x .- minimum(x), MaterialSpec))
+	
 	for i in eachindex(MaterialSpec)
 		if reduce(|, isnan.(MaterialSpec[i]))
 			MaterialSpec[i] .= 0
@@ -282,7 +371,62 @@ begin
 end
 
 # ╔═╡ 2bde76cc-f998-431b-80e1-426f590b8171
-println(get(sm[materialmatch[n]], "Type", 1));plot(HypObs[n],label="EM Capured $n");plot!(MaterialSpec[materialmatch[n]][1:130],label=get(sm[materialmatch[n]], "Name", 1))
+@info lowercase(get(sm[materialmatch[n]], "Type", 1));plot(HypObs[n],label="EM Capured $n");plot!(MaterialSpec[materialmatch[n]][1:130],label=get(sm[materialmatch[n]], "Name", 1))
+
+# ╔═╡ 692bd5fa-cc6f-4483-94c5-80ebfddd3422
+md"""
+# Generating Abundance maps of image
+"""
+
+# ╔═╡ 2f671849-a72d-4c54-b977-afa32a0f035c
+function SparseArrays.sparse(Index::Vector{CartesianIndex},Data::Vector)::SparseMatrixCSC
+	I = getindex.(Index, 1)
+	J = getindex.(Index, 2)
+	return sparse(I, J, Data)
+end
+
+# ╔═╡ 515f63b3-f3bd-4ed9-9529-de98b83a298f
+begin
+	Data = (pinv(Model[1])*Model[3])'
+	
+	P = Vector{Matrix{Float64}}(undef,size(Data,2))
+	for i in 1:size(Data,2)
+		Ar = map(clamp01nan,sparse(Index, Data[:,i]))
+		P[i] = Ar
+	end
+	
+	Fig = Vector{Matrix{RGB{Float64}}}(undef, length(eachindex(P)[1:3:end-2]))
+	for i in eachindex(P)[1:3:end-2]
+		Fig[(i+2)÷3] = RGB.(P[i], P[i+1], P[i+2])
+	end
+
+	for i in eachindex(Fig)
+	#save("/home/rnarwar/Desktop/PlotsOut/VCA10dim/RGB$i.png", Fig[i])
+	end
+end
+
+# ╔═╡ 4be606c7-7f79-4155-99ab-f5aca921c3ef
+@bind ImageSelect Slider(1:NoEM2Extract÷3)
+
+# ╔═╡ b135e9fa-6623-49b8-84d6-f866ed762e99
+println("Composition of projection no.", ImageSelect); println("Use Slider Below to select different layer");Fig[ImageSelect]
+
+# ╔═╡ 735fd6e2-21ce-499a-a3ce-f47bb31402d9
+md"""
+# Validating VCA model on artificial data
+"""
+
+# ╔═╡ 71261f87-c992-441b-a172-163b832e19c2
+md"""
+The made up Image is fabricated using a set of randomly generated EMS.
+The graph below on the left shows the pure endmembers which we know with certainty.
+
+We then proceed to mix these end-members in an array and apply varying light intensity multipliers to simulate the affect of slope and sunlight along with Gaussian noise.
+
+Then the VCA algorithm is run to find out the said EMs.
+
+The graph on the below right shows the endmembers extracted using VCA.
+"""
 
 # ╔═╡ 5b864cbf-6c05-4147-9ea9-aeb5b5903ad0
 begin
@@ -326,37 +470,20 @@ end
 # ╔═╡ d1768854-2b0b-41f7-bfcc-d258f6a046df
 println("Use slider below to choose pure endmember and its closest match");matchplots[ems]
 
-# ╔═╡ 2f671849-a72d-4c54-b977-afa32a0f035c
-function SparseArrays.sparse(Index::Vector{CartesianIndex},Data::Vector)::SparseMatrixCSC
-	I = getindex.(Index, 1)
-	J = getindex.(Index, 2)
-	return sparse(I, J, Data)
-end
+# ╔═╡ 2e5701d1-1604-4730-8467-9fa969b689df
+md"""
+## THE END
+"""
 
-# ╔═╡ 515f63b3-f3bd-4ed9-9529-de98b83a298f
-begin
-	Data = (pinv(Model[1])*Model[3])'
-	P = Vector{Matrix{Float64}}(undef,size(Data,2))
-	for i in 1:size(Data,2)
-		#Ar = map(clamp01nan, collect(sparse(Index, Data[:,i])))
-		Ar = map(clamp01nan,sparse(Index, Data[:,i]))
-		P[i] = Ar
-	end
-	Fig = Vector{Matrix{RGB{Float64}}}(undef, length(eachindex(P)[1:3:end-2]))
-	for i in eachindex(P)[1:3:end-2]
-		#push!(Fig, spy(i, size=(3840,2160), size=(3600,1200); legend=false, colorbar=false, showaxis=false, ticks=false))
-		#push!(Fig, RGB.(P[i], P[i+1], P[i+2]))
-		Fig[(i+2)÷3] = RGB.(P[i], P[i+1], P[i+2])
-	end
-end
+# ╔═╡ 9edc2aeb-ea98-48fe-9d48-a09e13f8fc12
+html"<br><br><br><br><br><br><br><br><br><br><br><br><br><br>"
 
-# ╔═╡ b135e9fa-6623-49b8-84d6-f866ed762e99
-println("Composition of projection no.", ImageSelect); println("Use Slider Below to select different layer");Fig[ImageSelect]
-
-# ╔═╡ 7aff9d78-345b-4a72-8504-5a1e41b423f6
-for i in eachindex(Fig)
-	#save("/home/rnarwar/Desktop/PlotsOut/VCA10dim/RGB$i.png", Fig[i])
-end
+# ╔═╡ ccf2ec98-c9d9-4c73-9395-9ec804e52bcd
+md"""
+---
+---
+---
+"""
 
 # ╔═╡ a5516e71-e71f-47c6-b0e9-24af4c188f2b
 md"""
@@ -431,9 +558,16 @@ begin
 end
   ╠═╡ =#
 
+# ╔═╡ 4828c4da-8d2c-478c-aaa8-f51ad00243ca
+#=╠═╡
+sum(svd((Yo*Yo')/N).S[1:15])/sum(svd((Yo*Yo')/N).S)
+  ╠═╡ =#
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+Base64 = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
@@ -451,6 +585,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
+ArchGDAL = "~0.9.1"
 Colors = "~0.12.8"
 FileIO = "~1.14.0"
 ImageIO = "~0.5.9"
@@ -488,6 +623,12 @@ deps = ["LinearAlgebra"]
 git-tree-sha1 = "af92965fb30777147966f58acb05da51c5616b5f"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 version = "3.3.3"
+
+[[deps.ArchGDAL]]
+deps = ["CEnum", "ColorTypes", "Dates", "DiskArrays", "Extents", "GDAL", "GeoFormatTypes", "GeoInterface", "GeoInterfaceRecipes", "ImageCore", "Tables"]
+git-tree-sha1 = "65cdad9f49e0d2fec6b6abc80668ca49c034824b"
+uuid = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
+version = "0.9.1"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -643,6 +784,12 @@ uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
 deps = ["Mmap"]
 uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 
+[[deps.DiskArrays]]
+deps = ["OffsetArrays"]
+git-tree-sha1 = "230d999fc78652ea070312373ed1bfe2489e4fe5"
+uuid = "3c3547ce-8d99-4f5e-a174-61eb10b00ae3"
+version = "0.3.6"
+
 [[deps.Distances]]
 deps = ["LinearAlgebra", "SparseArrays", "Statistics", "StatsAPI"]
 git-tree-sha1 = "3258d0659f812acde79e8a74b11f17ac06d0ca04"
@@ -680,6 +827,11 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "bad72f730e9e91c08d9427d5e8db95478a3c323d"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
 version = "2.4.8+0"
+
+[[deps.Extents]]
+git-tree-sha1 = "5e1e4c53fa39afe63a7d356e30452249365fba99"
+uuid = "411431e0-e8b7-467b-b5e0-f676ba4f2910"
+version = "0.1.1"
 
 [[deps.FFMPEG]]
 deps = ["FFMPEG_jll"]
@@ -750,6 +902,24 @@ git-tree-sha1 = "aa31987c2ba8704e23c6c8ba8a4f769d5d7e4f91"
 uuid = "559328eb-81f9-559d-9380-de523a88c83c"
 version = "1.0.10+0"
 
+[[deps.GDAL]]
+deps = ["CEnum", "GDAL_jll", "NetworkOptions", "PROJ_jll"]
+git-tree-sha1 = "9ce70502472a9f23f8889f0f9e2be8451413fe7b"
+uuid = "add2ef01-049f-52c4-9ee2-e494f65e021a"
+version = "1.4.0"
+
+[[deps.GDAL_jll]]
+deps = ["Artifacts", "Expat_jll", "GEOS_jll", "JLLWrappers", "LibCURL_jll", "Libdl", "Libtiff_jll", "OpenJpeg_jll", "PROJ_jll", "Pkg", "SQLite_jll", "Zlib_jll", "Zstd_jll", "libgeotiff_jll"]
+git-tree-sha1 = "756a15a73ded80cf194e7458abeb6f559d5070e2"
+uuid = "a7073274-a066-55f0-b90d-d619367d196c"
+version = "300.500.0+1"
+
+[[deps.GEOS_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "4ceb4cdae127931b852ced4d3782bb51ab5e2632"
+uuid = "d604d12d-fa86-5845-992e-78dc15976526"
+version = "3.10.2+0"
+
 [[deps.GLFW_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pkg", "Xorg_libXcursor_jll", "Xorg_libXi_jll", "Xorg_libXinerama_jll", "Xorg_libXrandr_jll"]
 git-tree-sha1 = "51d2dfe8e590fbd74e7a842cf6d13d8a2f45dc01"
@@ -767,6 +937,23 @@ deps = ["Artifacts", "Bzip2_jll", "Cairo_jll", "FFMPEG_jll", "Fontconfig_jll", "
 git-tree-sha1 = "1e5490a51b4e9d07e8b04836f6008f46b48aaa87"
 uuid = "d2c73de3-f751-5644-a686-071e5b155ba9"
 version = "0.64.3+0"
+
+[[deps.GeoFormatTypes]]
+git-tree-sha1 = "434166198434a5c2fcc0a1a59d22c3b0ad460889"
+uuid = "68eda718-8dee-11e9-39e7-89f7f65f511f"
+version = "0.4.1"
+
+[[deps.GeoInterface]]
+deps = ["Extents"]
+git-tree-sha1 = "fb28b5dc239d0174d7297310ef7b84a11804dfab"
+uuid = "cf35fbd7-0cd7-5166-be24-54bfbe79505f"
+version = "1.0.1"
+
+[[deps.GeoInterfaceRecipes]]
+deps = ["GeoInterface", "RecipesBase"]
+git-tree-sha1 = "29e1ec25cfb6762f503a19495aec347acf867a9e"
+uuid = "0329782f-3d07-4b52-b9f6-d3137cf03c7a"
+version = "1.0.0"
 
 [[deps.GeometryBasics]]
 deps = ["EarCut_jll", "IterTools", "LinearAlgebra", "StaticArrays", "StructArrays", "Tables"]
@@ -1121,6 +1308,12 @@ version = "2.36.0+0"
 deps = ["Libdl", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
+[[deps.LittleCMS_jll]]
+deps = ["Artifacts", "JLLWrappers", "JpegTurbo_jll", "Libdl", "Libtiff_jll", "Pkg"]
+git-tree-sha1 = "110897e7db2d6836be22c18bffd9422218ee6284"
+uuid = "d3a379c0-f9a3-5b72-a4c0-6bf4d2e8af0f"
+version = "2.12.0+0"
+
 [[deps.LogExpFunctions]]
 deps = ["ChainRulesCore", "ChangesOfVariables", "DocStringExtensions", "InverseFunctions", "IrrationalConstants", "LinearAlgebra"]
 git-tree-sha1 = "09e4b894ce6a976c354a69041a04748180d43637"
@@ -1238,6 +1431,12 @@ git-tree-sha1 = "923319661e9a22712f24596ce81c54fc0366f304"
 uuid = "18a262bb-aa17-5467-a713-aee519bc75cb"
 version = "3.1.1+0"
 
+[[deps.OpenJpeg_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Libtiff_jll", "LittleCMS_jll", "Pkg", "libpng_jll"]
+git-tree-sha1 = "76374b6e7f632c130e78100b166e5a48464256f8"
+uuid = "643b3616-a352-519d-856d-80112ee9badc"
+version = "2.4.0+0"
+
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
@@ -1276,6 +1475,12 @@ deps = ["Base64", "CEnum", "ImageCore", "IndirectArrays", "OffsetArrays", "libpn
 git-tree-sha1 = "e925a64b8585aa9f4e3047b8d2cdc3f0e79fd4e4"
 uuid = "f57f5aa1-a3ce-4bc8-8ab9-96f992907883"
 version = "0.3.16"
+
+[[deps.PROJ_jll]]
+deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "Libtiff_jll", "Pkg", "SQLite_jll"]
+git-tree-sha1 = "12bd68665a0c3cb4635c4359d3fa9e2769ed59e5"
+uuid = "58948b4f-47e0-5654-a9ad-f609743f8632"
+version = "900.0.0+0"
 
 [[deps.PaddedViews]]
 deps = ["OffsetArrays"]
@@ -1418,6 +1623,12 @@ version = "1.3.1"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
+
+[[deps.SQLite_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
+git-tree-sha1 = "f2129f53b7c2ce4fe350e46d35b9772966a12ac0"
+uuid = "76ed43ae-9a5d-5a62-8c75-30186b810ce8"
+version = "3.39.0+0"
 
 [[deps.Scratch]]
 deps = ["Dates"]
@@ -1766,6 +1977,12 @@ git-tree-sha1 = "daacc84a041563f965be61859a36e17c4e4fcd55"
 uuid = "f638f0a6-7fb0-5443-88ba-1cc74229b280"
 version = "2.0.2+0"
 
+[[deps.libgeotiff_jll]]
+deps = ["Artifacts", "JLLWrappers", "LibCURL_jll", "Libdl", "Libtiff_jll", "PROJ_jll", "Pkg"]
+git-tree-sha1 = "e51bca193c8a4774dc1d2e5d40d5c4491c1b4fd4"
+uuid = "06c338fa-64ff-565b-ac2f-249532af990e"
+version = "1.7.1+0"
+
 [[deps.libpng_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
 git-tree-sha1 = "94d180a6d2b5e55e447e2d27a29ed04fe79eb30c"
@@ -1806,35 +2023,49 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╟─1c659856-b4f1-450f-a452-79756c7856dc
-# ╟─2bde76cc-f998-431b-80e1-426f590b8171
-# ╟─8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
-# ╟─99cf8901-2fd2-4011-bc44-d5528ee876a0
-# ╟─b135e9fa-6623-49b8-84d6-f866ed762e99
-# ╟─4be606c7-7f79-4155-99ab-f5aca921c3ef
-# ╟─71261f87-c992-441b-a172-163b832e19c2
-# ╟─5b864cbf-6c05-4147-9ea9-aeb5b5903ad0
-# ╟─d1768854-2b0b-41f7-bfcc-d258f6a046df
-# ╟─88174827-db9c-4a46-a2da-aa4b6c7413c6
-# ╟─25476048-94e9-4b3f-9fa7-a8699d95ec63
-# ╟─a9a58df3-d24b-48cc-841d-608053a6336c
-# ╟─2e5701d1-1604-4730-8467-9fa969b689df
-# ╟─9edc2aeb-ea98-48fe-9d48-a09e13f8fc12
-# ╟─515f63b3-f3bd-4ed9-9529-de98b83a298f
-# ╟─7aff9d78-345b-4a72-8504-5a1e41b423f6
-# ╟─314ccaa3-7905-42fa-9146-2e2fab69fd41
+# ╠═4061c376-dc7c-490e-a607-9d55ad8f05f3
+# ╠═e4305ce2-6a7a-4091-b209-d794f6d8dc56
+# ╠═08fc6aaf-5894-4bee-baaf-f24d10752173
+# ╟─e626b16c-2a51-4ecb-aa85-852e34614181
+# ╟─8272fcc9-2118-4088-b339-571a231f49a3
+# ╟─64feecf9-5231-404e-9346-0cc0548dc356
+# ╠═91dc3a4b-01f5-4959-9ef8-ea0895e3b765
+# ╟─0eca535c-9779-49a1-90b3-a79247e62de5
+# ╟─da3c2c91-2b67-44a6-aa7b-86819d941367
+# ╟─c3e5a89c-1994-48b2-95bd-4a08b6c43c30
+# ╟─6f2ee555-bfee-4caf-8ef5-bdabf924b888
 # ╟─8c810275-ea32-44c4-9bfb-20108f861159
-# ╟─853edae3-22ba-4fe6-818a-34a5ac005675
-# ╟─ccf2ec98-c9d9-4c73-9395-9ec804e52bcd
+# ╠═853edae3-22ba-4fe6-818a-34a5ac005675
+# ╟─fce4a1d4-dc42-48ca-886c-37af467e870e
 # ╟─7cde3546-5913-46ed-a044-3f9cc7177cee
 # ╟─af3de22f-4801-432a-9329-832a851ad176
 # ╟─4262fd8d-dca8-4ea9-8850-caed586da9d2
 # ╟─c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
+# ╠═1c659856-b4f1-450f-a452-79756c7856dc
+# ╟─2bde76cc-f998-431b-80e1-426f590b8171
+# ╟─8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
+# ╟─99cf8901-2fd2-4011-bc44-d5528ee876a0
+# ╟─0a81aa25-a572-4223-b7d0-5f12f333b360
+# ╟─67b54389-bb16-4aff-ac9c-a0af1b6862ea
+# ╟─1515fcc7-8cc3-4e76-91df-3da892baebab
+# ╠═25476048-94e9-4b3f-9fa7-a8699d95ec63
+# ╠═a9a58df3-d24b-48cc-841d-608053a6336c
+# ╟─692bd5fa-cc6f-4483-94c5-80ebfddd3422
+# ╟─515f63b3-f3bd-4ed9-9529-de98b83a298f
 # ╠═2f671849-a72d-4c54-b977-afa32a0f035c
-# ╠═4061c376-dc7c-490e-a607-9d55ad8f05f3
-# ╠═e4305ce2-6a7a-4091-b209-d794f6d8dc56
-# ╠═08fc6aaf-5894-4bee-baaf-f24d10752173
+# ╠═b135e9fa-6623-49b8-84d6-f866ed762e99
+# ╠═4be606c7-7f79-4155-99ab-f5aca921c3ef
+# ╟─735fd6e2-21ce-499a-a3ce-f47bb31402d9
+# ╟─71261f87-c992-441b-a172-163b832e19c2
+# ╟─5b864cbf-6c05-4147-9ea9-aeb5b5903ad0
+# ╟─d1768854-2b0b-41f7-bfcc-d258f6a046df
+# ╟─88174827-db9c-4a46-a2da-aa4b6c7413c6
+# ╟─314ccaa3-7905-42fa-9146-2e2fab69fd41
+# ╟─2e5701d1-1604-4730-8467-9fa969b689df
+# ╟─9edc2aeb-ea98-48fe-9d48-a09e13f8fc12
+# ╟─ccf2ec98-c9d9-4c73-9395-9ec804e52bcd
 # ╟─a5516e71-e71f-47c6-b0e9-24af4c188f2b
 # ╟─e6d7074d-2b20-415c-8005-31ec6b0387d7
+# ╠═4828c4da-8d2c-478c-aaa8-f51ad00243ca
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
