@@ -50,10 +50,17 @@ md"""
 # Loading and pre-processing Data
 """
 
+# ╔═╡ 4b856878-3f2a-434e-8920-9c3178bdff40
+md"""
+Hyperspectral data exists as a 3 dimensional array (L, M, N).
+
+Where L are the no. of bands, M and N are the height and width (or physical dimensions) of the image.
+"""
+
 # ╔═╡ 91dc3a4b-01f5-4959-9ef8-ea0895e3b765
-struct IPixel
+struct IPixel{pType <: UInt8}
 	Ind::CartesianIndex
-	Vec::Vector{UInt8}
+	Vec::Vector{pType}
 end
 
 # ╔═╡ 8272fcc9-2118-4088-b339-571a231f49a3
@@ -84,19 +91,6 @@ function IndexFlat(Data::Array{UInt8, 3})::Matrix{IPixel}
 	return A
 end
 
-# ╔═╡ 0eca535c-9779-49a1-90b3-a79247e62de5
-function LoadData()::Tuple{Matrix{UInt8}, Vector{CartesianIndex}}
-	X, Index = load("/home/rnarwar/Pixxel/project/testdata/IndARD.jld2", "Data", "Index")
-	return X, Index
-end
-
-# ╔═╡ da3c2c91-2b67-44a6-aa7b-86819d941367
-function LoadTIF()::Array{UInt8}
-	Data = AG.readraster("/home/rnarwar/Pixxel/project/testdata/Hyperion_Canada.tif")
-	Data = Data[:,:,setdiff(1:end, (88:108),(131:158))]; # discard 88:108 131:158
-	return Data
-end
-
 # ╔═╡ c3e5a89c-1994-48b2-95bd-4a08b6c43c30
 function Discard0(X::Matrix)
 	Out = []
@@ -115,6 +109,50 @@ function Flatten(Data::Array)::Matrix
 	Out = reshape(Data, a*b, c)
 	return Out
 end
+
+# ╔═╡ 0eca535c-9779-49a1-90b3-a79247e62de5
+function LoadData()::Tuple{Matrix{UInt8}, Vector{CartesianIndex}}
+	X, Index = load("/home/rnarwar/Pixxel/project/testdata/IndARD.jld2", "Data", "Index")
+	return X, Index
+end
+
+# ╔═╡ da3c2c91-2b67-44a6-aa7b-86819d941367
+function LoadTIF()::Array{UInt8}
+	Data = AG.readraster("/home/rnarwar/Pixxel/project/testdata/Hyperion_Canada.tif")
+	Data = Data[:,:,setdiff(1:end, 88:108,131:158)]; # discard 88:108 131:158
+	return Data
+end
+
+# ╔═╡ 675bd5db-35ee-4f07-a736-f566e55d9026
+md"""
+We use the functions 
+
+* $LoadTIF (Return raw 3 dimensional image.)
+
+* $LoadData (Returns any processed data.)
+
+to load data. 
+"""
+
+# ╔═╡ 98b6110f-0d85-4949-825d-334f429d8eb9
+md"""
+$LoadTIF returns 3 dimensional array.
+
+Which is passed through 
+
+* $IndexFlat 
+> * (Reshapes(flattens) the 3D array into a 2D array of dimensions L and M×N)
+> * (Stores the Cartesian Indices of the pixels position)
+> * (Returns the data in the format of IPixel (IndexedPixel))
+
+* $Discard0 
+> * (Removes pixels which are 0 at all bands.)
+> * (Returns the data in the format of Tuple)
+
+as follows 
+
+> Index, X = Discard0(IndexFlat(LoadTIF()))
+"""
 
 # ╔═╡ 8c810275-ea32-44c4-9bfb-20108f861159
 begin
@@ -335,6 +373,9 @@ function SelectSpectra(sp)
 	return Spectra
 end
 
+# ╔═╡ 07c660a2-b4ad-4678-8223-8c58768b2093
+Model[1][:,1]
+
 # ╔═╡ 25476048-94e9-4b3f-9fa7-a8699d95ec63
 begin
 	sm = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Samples.json")
@@ -355,6 +396,9 @@ begin
 	end
 	MaterialSpec
 end
+
+# ╔═╡ 6a658ea9-5c15-4675-b1c0-667c6e919b11
+reduce(+, map(x -> sum(x) != 0, MaterialSpec))
 
 # ╔═╡ a9a58df3-d24b-48cc-841d-608053a6336c
 begin
@@ -2023,32 +2067,37 @@ version = "0.9.1+5"
 """
 
 # ╔═╡ Cell order:
-# ╠═4061c376-dc7c-490e-a607-9d55ad8f05f3
-# ╠═e4305ce2-6a7a-4091-b209-d794f6d8dc56
-# ╠═08fc6aaf-5894-4bee-baaf-f24d10752173
+# ╟─4061c376-dc7c-490e-a607-9d55ad8f05f3
+# ╟─e4305ce2-6a7a-4091-b209-d794f6d8dc56
+# ╟─08fc6aaf-5894-4bee-baaf-f24d10752173
 # ╟─e626b16c-2a51-4ecb-aa85-852e34614181
+# ╟─4b856878-3f2a-434e-8920-9c3178bdff40
+# ╟─675bd5db-35ee-4f07-a736-f566e55d9026
+# ╟─98b6110f-0d85-4949-825d-334f429d8eb9
 # ╟─8272fcc9-2118-4088-b339-571a231f49a3
 # ╟─64feecf9-5231-404e-9346-0cc0548dc356
 # ╠═91dc3a4b-01f5-4959-9ef8-ea0895e3b765
-# ╟─0eca535c-9779-49a1-90b3-a79247e62de5
-# ╟─da3c2c91-2b67-44a6-aa7b-86819d941367
 # ╟─c3e5a89c-1994-48b2-95bd-4a08b6c43c30
 # ╟─6f2ee555-bfee-4caf-8ef5-bdabf924b888
+# ╟─0eca535c-9779-49a1-90b3-a79247e62de5
+# ╟─da3c2c91-2b67-44a6-aa7b-86819d941367
 # ╟─8c810275-ea32-44c4-9bfb-20108f861159
-# ╠═853edae3-22ba-4fe6-818a-34a5ac005675
+# ╟─853edae3-22ba-4fe6-818a-34a5ac005675
 # ╟─fce4a1d4-dc42-48ca-886c-37af467e870e
 # ╟─7cde3546-5913-46ed-a044-3f9cc7177cee
 # ╟─af3de22f-4801-432a-9329-832a851ad176
 # ╟─4262fd8d-dca8-4ea9-8850-caed586da9d2
 # ╟─c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
-# ╠═1c659856-b4f1-450f-a452-79756c7856dc
+# ╟─1c659856-b4f1-450f-a452-79756c7856dc
 # ╟─2bde76cc-f998-431b-80e1-426f590b8171
 # ╟─8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
 # ╟─99cf8901-2fd2-4011-bc44-d5528ee876a0
 # ╟─0a81aa25-a572-4223-b7d0-5f12f333b360
-# ╟─67b54389-bb16-4aff-ac9c-a0af1b6862ea
-# ╟─1515fcc7-8cc3-4e76-91df-3da892baebab
+# ╠═67b54389-bb16-4aff-ac9c-a0af1b6862ea
+# ╠═1515fcc7-8cc3-4e76-91df-3da892baebab
+# ╠═07c660a2-b4ad-4678-8223-8c58768b2093
 # ╠═25476048-94e9-4b3f-9fa7-a8699d95ec63
+# ╠═6a658ea9-5c15-4675-b1c0-667c6e919b11
 # ╠═a9a58df3-d24b-48cc-841d-608053a6336c
 # ╟─692bd5fa-cc6f-4483-94c5-80ebfddd3422
 # ╟─515f63b3-f3bd-4ed9-9529-de98b83a298f
