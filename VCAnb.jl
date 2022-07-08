@@ -119,7 +119,6 @@ end
 # ╔═╡ da3c2c91-2b67-44a6-aa7b-86819d941367
 function LoadTIF()::Array{UInt8}
 	Data = AG.readraster("/home/rnarwar/Pixxel/project/testdata/Hyperion_Canada.tif")
-	Data = Data[:,:,setdiff(1:end, 88:108,131:158)]; # discard 88:108 131:158
 	return Data
 end
 
@@ -157,14 +156,21 @@ as follows
 # ╔═╡ 8c810275-ea32-44c4-9bfb-20108f861159
 begin
 	hyperion_bands = [426.82, 436.99, 447.17, 457.34, 467.52, 477.69, 487.87, 498.04, 508.22, 518.39, 528.57, 538.74, 548.92, 559.09, 569.27, 579.45, 589.62, 599.8, 609.97, 620.15, 630.32, 640.5, 650.67, 660.85, 671.02, 681.2, 691.37, 701.55, 711.72, 721.9, 732.07, 742.25, 752.43, 762.6, 772.78, 782.95, 793.13, 803.3, 813.48, 823.65, 833.83, 844.0, 854.18, 864.35, 874.53, 884.7, 894.88, 905.05, 915.23, 922.54, 932.64, 942.73, 952.82, 962.91, 972.99, 983.08, 993.17, 1003.3, 1013.3, 1023.4, 1033.49, 1043.59, 1053.69, 1063.79, 1073.89, 1083.99, 1094.09, 1104.19, 1114.19, 1124.28, 1134.38, 1144.48, 1154.58, 1164.68, 1174.77, 1184.87, 1194.97, 1205.07, 1215.17, 1225.17, 1235.27, 1245.36, 1255.46, 1265.56, 1275.66, 1285.76, 1295.86, 1305.96, 1316.05, 1326.05, 1336.15, 1346.25, 1356.35, 1366.45, 1376.55, 1386.65, 1396.74, 1406.84, 1416.94, 1426.94, 1437.04, 1447.14, 1457.23, 1467.33, 1477.43, 1487.53, 1497.63, 1507.73, 1517.83, 1527.92, 1537.92, 1548.02, 1558.12, 1568.22, 1578.32, 1588.42, 1598.51, 1608.61, 1618.71, 1628.81, 1638.81, 1648.9, 1659.0, 1669.1, 1679.2, 1689.3, 1699.4, 1709.5, 1719.6, 1729.7, 1739.7, 1749.79, 1759.89, 1769.99, 1780.09, 1790.19, 1800.29, 1810.38, 1820.48, 1830.58, 1840.58, 1850.68, 1860.78, 1870.87, 1880.98, 1891.07, 1901.17, 1911.27, 1921.37, 1931.47, 1941.57, 1951.57, 1961.66, 1971.76, 1981.86, 1991.96, 2002.06, 2012.15, 2022.25, 2032.35, 2042.45, 2052.45, 2062.55, 2072.65, 2082.75, 2092.84, 2102.94, 2113.04, 2123.14, 2133.24, 2143.34, 2153.34, 2163.43, 2173.53, 2183.63, 2193.73, 2203.83, 2213.93, 2224.03, 2234.12, 2244.22, 2254.22, 2264.32, 2274.42, 2284.52, 2294.61, 2304.71, 2314.81, 2324.91, 2335.01, 2345.11, 2355.21, 2365.2, 2375.3, 2385.4, 2395.5]
-	SelectedBands = (hyperion_bands[setdiff(1:end, (88:108),(131:158))]) * 1e-3
+	
+	set = setdiff(1:length(hyperion_bands), 88:108, 131:158,
+		length(hyperion_bands)-10:length(hyperion_bands))
+	
+	SelectedBands = (hyperion_bands[set]) * 1e-3
+	# discard 88:108 131:158 and last 20
 end
 
 # ╔═╡ 853edae3-22ba-4fe6-818a-34a5ac005675
 begin
-	X, Index = load("/home/rnarwar/Pixxel/project/testdata/IndARD.jld2", "Data", "Index")
 	#Index, X = Discard0(IndexFlat(LoadTIF()[:,100:end-100,:]))
-	X = permutedims(X[:, 1:130])
+	#@save "/home/rnarwar/Pixxel/project/testdata/IndARD.jld2" Index X
+
+	@load "/home/rnarwar/Pixxel/project/testdata/IndARD.jld2"
+	X = permutedims(X)[set,:]
 end
 
 # ╔═╡ fce4a1d4-dc42-48ca-886c-37af467e870e
@@ -328,9 +334,9 @@ end
 
 # ╔═╡ 1c659856-b4f1-450f-a452-79756c7856dc
 begin
-	NoEM2Extract = 15
+	NoEM2Extract = 21
 	Model = VCA(X, NoEM2Extract, 0.0);
-	plot(SelectedBands[1:130],Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
+	plot(SelectedBands,Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
 end
 
 # ╔═╡ 8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
@@ -373,9 +379,6 @@ function SelectSpectra(sp)
 	return Spectra
 end
 
-# ╔═╡ 07c660a2-b4ad-4678-8223-8c58768b2093
-Model[1][:,1]
-
 # ╔═╡ 25476048-94e9-4b3f-9fa7-a8699d95ec63
 begin
 	sm = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Samples.json")
@@ -392,13 +395,15 @@ begin
 	for i in eachindex(MaterialSpec)
 		if reduce(|, isnan.(MaterialSpec[i]))
 			MaterialSpec[i] .= 0
+		elseif (lowercase(get(sm[i] , "Type", 1)) == "mineral") || lowercase(get(sm[i] , "Type", 1)) == "rock"
+			MaterialSpec[i] .= 0
 		end
 	end
 	MaterialSpec
 end
 
-# ╔═╡ 6a658ea9-5c15-4675-b1c0-667c6e919b11
-reduce(+, map(x -> sum(x) != 0, MaterialSpec))
+# ╔═╡ 29a6d9d9-eefc-4758-8e5c-52f8883015cc
+lowercase(get(sm[1251] , "Type", 1))
 
 # ╔═╡ a9a58df3-d24b-48cc-841d-608053a6336c
 begin
@@ -407,7 +412,7 @@ begin
 	for sp in HypObs
 		diff = Vector{Float32}(undef,length(MaterialSpec))
 		for i in eachindex(MaterialSpec)
-			diff[i] = norm(MaterialSpec[i][1:130] - sp)
+			diff[i] = norm(MaterialSpec[i] - sp)
 		end
 		materialmatch[j]=last(findmin(diff))
 		j+=1
@@ -415,12 +420,35 @@ begin
 end
 
 # ╔═╡ 2bde76cc-f998-431b-80e1-426f590b8171
-@info lowercase(get(sm[materialmatch[n]], "Type", 1));plot(HypObs[n],label="EM Capured $n");plot!(MaterialSpec[materialmatch[n]][1:130],label=get(sm[materialmatch[n]], "Name", 1))
+begin
+	@info lowercase(get(sm[materialmatch[n]], "Type", 1));
+	plot(HypObs[n],label="EM Capured $n");
+	plot!(MaterialSpec[materialmatch[n]],label=get(sm[materialmatch[n]], "Name", 1))
+end
 
 # ╔═╡ 692bd5fa-cc6f-4483-94c5-80ebfddd3422
 md"""
 # Generating Abundance maps of image
 """
+
+# ╔═╡ 4be606c7-7f79-4155-99ab-f5aca921c3ef
+@bind ImageSelect Slider(1:NoEM2Extract÷3)
+
+# ╔═╡ 6b7bc7ea-19bb-4195-bf59-13290464f2b4
+begin
+	function CountClasses(name)
+		if  (name == "rock") | (name == "soil")
+			return "soil"
+		elseif (name == "vegetation") | (name == "non photosynthetic vegetation") 
+			return "vegetation"
+		elseif (name == "manmade")
+			return "manmade"
+		elseif (name == "water")
+			return "water"
+		end
+		return "unknown"
+	end
+end
 
 # ╔═╡ 2f671849-a72d-4c54-b977-afa32a0f035c
 function SparseArrays.sparse(Index::Vector{CartesianIndex},Data::Vector)::SparseMatrixCSC
@@ -449,11 +477,31 @@ begin
 	end
 end
 
-# ╔═╡ 4be606c7-7f79-4155-99ab-f5aca921c3ef
-@bind ImageSelect Slider(1:NoEM2Extract÷3)
-
 # ╔═╡ b135e9fa-6623-49b8-84d6-f866ed762e99
 println("Composition of projection no.", ImageSelect); println("Use Slider Below to select different layer");Fig[ImageSelect]
+
+# ╔═╡ e384162c-89f5-4d68-b126-670f802d3152
+begin
+	layers = map(x->lowercase(get(sm[x], "Type", 1)),materialmatch)
+	layers = map(CountClasses, layers)
+
+	class = ([l == mat for mat in unique(layers), l in layers])
+	classlayer = zeros(size(P[1])..., size(class,1))
+
+	for i=1:size(class,2)
+		for j=1:size(class,1)
+			if class[j, i]
+				classlayer[:,:,j] += P[i]
+			end
+		end
+	end
+end
+
+# ╔═╡ 885cd7d4-7b83-40e8-8248-8a8b8a854e9f
+@bind SelectClass Slider(1:size(class,1))
+
+# ╔═╡ 90feaea7-ecd4-4e5b-9b55-c47a8b8754e0
+@info unique(layers)[SelectClass]; RGB.(classlayer[:,:,SelectClass]/maximum(classlayer[:,:,SelectClass]))
 
 # ╔═╡ 735fd6e2-21ce-499a-a3ce-f47bb31402d9
 md"""
@@ -2074,36 +2122,39 @@ version = "0.9.1+5"
 # ╟─4b856878-3f2a-434e-8920-9c3178bdff40
 # ╟─675bd5db-35ee-4f07-a736-f566e55d9026
 # ╟─98b6110f-0d85-4949-825d-334f429d8eb9
-# ╟─8272fcc9-2118-4088-b339-571a231f49a3
-# ╟─64feecf9-5231-404e-9346-0cc0548dc356
+# ╠═8272fcc9-2118-4088-b339-571a231f49a3
+# ╠═64feecf9-5231-404e-9346-0cc0548dc356
 # ╠═91dc3a4b-01f5-4959-9ef8-ea0895e3b765
-# ╟─c3e5a89c-1994-48b2-95bd-4a08b6c43c30
-# ╟─6f2ee555-bfee-4caf-8ef5-bdabf924b888
-# ╟─0eca535c-9779-49a1-90b3-a79247e62de5
-# ╟─da3c2c91-2b67-44a6-aa7b-86819d941367
-# ╟─8c810275-ea32-44c4-9bfb-20108f861159
-# ╟─853edae3-22ba-4fe6-818a-34a5ac005675
+# ╠═c3e5a89c-1994-48b2-95bd-4a08b6c43c30
+# ╠═6f2ee555-bfee-4caf-8ef5-bdabf924b888
+# ╠═0eca535c-9779-49a1-90b3-a79247e62de5
+# ╠═da3c2c91-2b67-44a6-aa7b-86819d941367
+# ╠═8c810275-ea32-44c4-9bfb-20108f861159
+# ╠═853edae3-22ba-4fe6-818a-34a5ac005675
 # ╟─fce4a1d4-dc42-48ca-886c-37af467e870e
 # ╟─7cde3546-5913-46ed-a044-3f9cc7177cee
 # ╟─af3de22f-4801-432a-9329-832a851ad176
 # ╟─4262fd8d-dca8-4ea9-8850-caed586da9d2
 # ╟─c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
-# ╟─1c659856-b4f1-450f-a452-79756c7856dc
-# ╟─2bde76cc-f998-431b-80e1-426f590b8171
+# ╠═1c659856-b4f1-450f-a452-79756c7856dc
+# ╠═2bde76cc-f998-431b-80e1-426f590b8171
 # ╟─8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
 # ╟─99cf8901-2fd2-4011-bc44-d5528ee876a0
 # ╟─0a81aa25-a572-4223-b7d0-5f12f333b360
 # ╠═67b54389-bb16-4aff-ac9c-a0af1b6862ea
 # ╠═1515fcc7-8cc3-4e76-91df-3da892baebab
-# ╠═07c660a2-b4ad-4678-8223-8c58768b2093
 # ╠═25476048-94e9-4b3f-9fa7-a8699d95ec63
-# ╠═6a658ea9-5c15-4675-b1c0-667c6e919b11
+# ╠═29a6d9d9-eefc-4758-8e5c-52f8883015cc
 # ╠═a9a58df3-d24b-48cc-841d-608053a6336c
 # ╟─692bd5fa-cc6f-4483-94c5-80ebfddd3422
-# ╟─515f63b3-f3bd-4ed9-9529-de98b83a298f
-# ╠═2f671849-a72d-4c54-b977-afa32a0f035c
 # ╠═b135e9fa-6623-49b8-84d6-f866ed762e99
 # ╠═4be606c7-7f79-4155-99ab-f5aca921c3ef
+# ╠═90feaea7-ecd4-4e5b-9b55-c47a8b8754e0
+# ╠═885cd7d4-7b83-40e8-8248-8a8b8a854e9f
+# ╠═e384162c-89f5-4d68-b126-670f802d3152
+# ╠═6b7bc7ea-19bb-4195-bf59-13290464f2b4
+# ╠═515f63b3-f3bd-4ed9-9529-de98b83a298f
+# ╠═2f671849-a72d-4c54-b977-afa32a0f035c
 # ╟─735fd6e2-21ce-499a-a3ce-f47bb31402d9
 # ╟─71261f87-c992-441b-a172-163b832e19c2
 # ╟─5b864cbf-6c05-4147-9ea9-aeb5b5903ad0
