@@ -50,13 +50,6 @@ md"""
 # Loading and pre-processing Data
 """
 
-# ╔═╡ 4b856878-3f2a-434e-8920-9c3178bdff40
-md"""
-Hyperspectral data exists as a 3 dimensional array (L, M, N).
-
-Where L are the no. of bands, M and N are the height and width (or physical dimensions) of the image.
-"""
-
 # ╔═╡ 91dc3a4b-01f5-4959-9ef8-ea0895e3b765
 begin
 
@@ -108,62 +101,17 @@ begin
 end
 end
 
-# ╔═╡ c3e5a89c-1994-48b2-95bd-4a08b6c43c30
-function Discard0(X::Matrix)
-	Out = []
-	for i in 1:size(X,1)
-		if sum(X[i,:]) != 0
-			push!(Out, X[i,:])
-		end
-	end
-	Out = permutedims(hcat(Out...))
-	return Out
-end
-
-# ╔═╡ 6f2ee555-bfee-4caf-8ef5-bdabf924b888
-function Flatten(Data::Array)::Matrix
-	a,b,c =size(Data)
-	Out = reshape(Data, a*b, c)
-	return Out
-end
-
-# ╔═╡ 0eca535c-9779-49a1-90b3-a79247e62de5
-function LoadData()::Tuple{Matrix{UInt8}, Vector{CartesianIndex}}
-	X, Index = load("/home/rnarwar/Pixxel/project/testdata/IndARD.jld2", "Data", "Index")
-	return X, Index
-end
-
 # ╔═╡ da3c2c91-2b67-44a6-aa7b-86819d941367
-function LoadTIF()::Array{UInt8}
-	Data = AG.readraster("/home/rnarwar/Pixxel/project/testdata/Hyperion_Canada.tif")
+begin
+
+"""
+* (Reads the .TIF file as per path given)
+* (Return 3-D Array with HSI)"""
+function LoadTIF(path = "/home/rnarwar/Pixxel/project/testdata/Hyperion_Canada.tif"::String)::Array{UInt8}
+	Data = AG.readraster(path)
 	return Data
 end
-
-# ╔═╡ 675bd5db-35ee-4f07-a736-f566e55d9026
-md"""
-We use the functions 
-
-* $LoadTIF (Return raw 3 dimensional image.)
-
-* $LoadData (Returns any processed data.)
-
-to load data. 
-"""
-
-# ╔═╡ 98b6110f-0d85-4949-825d-334f429d8eb9
-md"""
-$LoadTIF returns 3 dimensional array.
-
-Which is passed through 
-
-* $IndexFlat 
-
-* $Discard0 
-
-as follows 
-
-> Index, X = Discard0(IndexFlat(LoadTIF()))
-"""
+end
 
 # ╔═╡ 8c810275-ea32-44c4-9bfb-20108f861159
 begin
@@ -200,21 +148,63 @@ md"""
 # Running VCA on dataset
 """
 
-# ╔═╡ 7cde3546-5913-46ed-a044-3f9cc7177cee
-function SNRcalc(Y::Matrix{UInt8},Rm,x)
-	L,N, = size(Y)
-	p,N, = size(x)
+# ╔═╡ 40ed31f5-27d6-4481-9fc5-f74e5083a85c
+function VCA(Y::Matrix{pType},
+             R::Int64,
+             SNRin::Float64)::Tuple{Matrix{pType},
+                                    Vector{Int64},
+                                    Matrix{pType}} where pType <: Union{Float32,Float64}
 
-	Py = sum(Y .^ 2)/N
-	Px = sum(x .^ 2)/N + sum(Rm .^ 2)
+    L,N, = size(Y)
+    ym = mean(Y, dims=2)
+    Yo = Y .- ym
+    Ud = svd((Yo*Yo')/N).U[:,begin:R]
+    xp = Ud'*Yo
 
-	SNRest = 10*log10(Complex((Px - p/L*Py)/(Py - Px)))
-	#println("SNRest=" ,norm(SNRest))
-	return norm(SNRest)
+	#SNR = SNRin==0.0 ? SNRcalc(Y, ym, xp) : SNRin
+	SNR = SNRin
+	
+    SNRth = 15 + 10*log10(R)
+
+    if SNR < SNRth # Assume Y = 20x1000 & R = 3
+        d = R-1 # d = 2
+
+        Ud = Ud[:,begin:d] # Ud = 20x2
+        x = Ud'*Yo # xp = 2x1000
+        Yp = Ud*x .+ ym # Yp = 20x1000
+        c = maximum(sum(x.^2))^0.5 # c = 1x1
+        y = vcat(x, c*ones(1,N)) # y = 3x1
+		
+    else
+        d = R # d = 3
+		
+        Ud = Ud[:,begin:d] # Ud = 20x3
+        x = Ud'*Yo # x = 3x1000
+        Yp = Ud*x .+ ym # Yp = 20x1000
+        u = mean(x, dims=2) # u = 3x1
+        y = x./(u'*x) # y = 3x1
+
+    end
+
+    indice = zeros(Int,R)
+    A = zeros(R,R)
+    A[end,begin] = 1
+
+    for i=1:R
+        w = rand(R,1)
+        f = w - (A* (pinv(A) * w))
+        f = f/norm(f)
+        v = f' * y
+        indice[i] = argmax(abs.(v))[2]
+        A[:,i] = y[:, indice[i]]
+    end
+
+    Ae = Yp[:,indice]
+    return Ae, indice, Yp
 end
 
 # ╔═╡ c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
-function SNRcalc(Y::Matrix,Rm,x)
+function SNRcalc(Y::Matrix,Rm,x)::Real
 	L,N, = size(Y)
 	p,N, = size(x)
 
@@ -222,149 +212,17 @@ function SNRcalc(Y::Matrix,Rm,x)
 	Px = sum(x .^ 2)/N + sum(Rm .^ 2)
 
 	SNRest = 10*log10(Complex((Px - p/L*Py)/(Py - Px)))
-	#println("SNRest=" ,norm(SNRest))
-	return norm(SNRest)
-end
-
-# ╔═╡ af3de22f-4801-432a-9329-832a851ad176
-function VCA(Y::Matrix{UInt8},R::Int64,SNRin::Float64)::Tuple{Matrix{Float64}, Vector{Int64}, Matrix{Float64}}
-	L,N, = size(Y)
-	
-	if SNRin == 0
-		ym = mean(Y, dims=2)
-		Yo = Y .- ym
-		Ud = svd((Yo*Yo')/N).U[:,begin:R]
-		xp = Ud'*Yo
-
-		SNR = SNRcalc(Y, ym, xp)
-	else
-		SNR = SNRin
-	end
-	SNRth = 15 + 10*log10(R)
-
-	if SNR < SNRth
-		d = R-1
-		if SNRin == 0
-			Ud = Ud[:,begin:d]
-		else
-			ym = mean(Y, dims=2)
-			Yo = Y .- ym
-
-			Ud = svd((Yo*Yo')/N).U[:,begin:d]
-			xp = Ud'*Yo
-		end
-
-		Yp = Ud*xp[begin:d,:] .+ ym
-
-		x = xp[begin:d,:]
-		c = maximum(sum(x.^2))^0.5
-		y = vcat(x, c*ones(1,N))
-	else
-		d = R
-		Ud = svd((Yo*Yo')/N).U[:,begin:d]
-
-		xp = Ud'*Y
-		Yp = Ud*xp[begin:d,:]
-
-		x = Ud'* Y
-		u = mean(x, dims=2)
-		y = x/(u'*x)
-	end
-
-	indice = zeros(Int,R)
-	A = zeros(R,R)
-	A[end,begin] = 1
-
-	for i=1:R
-		w = rand(R,1)
-		f = w - (A* (pinv(A) * w))
-		f = f/norm(f)
-
-		v = f' * y
-
-		indice[i] = argmax(abs.(v))[2]
-		A[:,i] = y[:, indice[i]]
-	end
-
-	Ae = Yp[:,indice]
-	return Ae, indice, Yp
-end
-
-# ╔═╡ 4262fd8d-dca8-4ea9-8850-caed586da9d2
-function VCA(Y::Matrix,R::Int64,SNRin::Float64)::Tuple{Matrix{Float64}, Vector{Int64}, Matrix{Float64}}
-	L,N, = size(Y)
-	
-	if SNRin == 0
-		ym = mean(Y, dims=2)
-		Yo = Y .- ym
-		Ud = svd((Yo*Yo')/N).U[:,begin:R]
-		xp = Ud'*Yo
-
-		SNR = SNRcalc(Y, ym, xp)
-	else
-		SNR = SNRin
-	end
-	SNRth = 15 + 10*log10(R)
-
-	if SNR < SNRth
-		d = R-1
-		if SNRin == 0
-			Ud = Ud[:,begin:d]
-		else
-			ym = mean(Y, dims=2)
-			Yo = Y .- ym
-
-			Ud = svd((Yo*Yo')/N).U[:,begin:d]
-			xp = Ud'*Yo
-		end
-
-		Yp = Ud*xp[begin:d,:] .+ ym
-
-		x = xp[begin:d,:]
-		c = maximum(sum(x.^2))^0.5
-		y = vcat(x, c*ones(1,N))
-	else
-		d = R
-		Ud = svd((Yo*Yo')/N).U[:,begin:d]
-
-		xp = Ud'*Y
-		Yp = Ud*xp[begin:d,:]
-
-		x = Ud'* Y
-		u = mean(x, dims=2)
-		y = x/(u'*x)
-	end
-
-	indice = zeros(Int,R)
-	A = zeros(R,R)
-	A[end,begin] = 1
-
-	for i=1:R
-		w = rand(R,1)
-		f = w - (A* (pinv(A) * w))
-		f = f/norm(f)
-
-		v = f' * y
-
-		indice[i] = argmax(abs.(v))[2]
-		A[:,i] = y[:, indice[i]]
-	end
-
-	Ae = Yp[:,indice]
-	return Ae, indice, Yp
+	SNRest = norm(SNRest)
+	#println("SNRest=" ,SNRest)
+	return SNRest
 end
 
 # ╔═╡ 1c659856-b4f1-450f-a452-79756c7856dc
 begin
-	NoEM2Extract = 9
-	Model = VCA(X, NoEM2Extract, 0.0);
+	global NoEM2Extract = 9
+	Model = VCA(X/1.0f0, NoEM2Extract, 0.0);
 	plot(SelectedBands,Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
 end
-
-# ╔═╡ 99cf8901-2fd2-4011-bc44-d5528ee876a0
-md"""
-The graph above shows the spectra of 9 end-members detected using the VCA algorihtm on Hyperion Data.
-"""
 
 # ╔═╡ 0a81aa25-a572-4223-b7d0-5f12f333b360
 md"""
@@ -374,12 +232,93 @@ md"""
 # ╔═╡ 8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
 @bind n Slider(1:NoEM2Extract, show_value=true)
 
+# ╔═╡ cc12e04d-52c1-475b-8b7c-e3f712569488
+function FindMaterial(ObservedSpectra, SpectraLibrary)
+	materialmatch = Vector{Int32}(undef,NoEM2Extract)
+
+	for j in eachindex(ObservedSpectra)
+		
+		diff = Vector{Float32}(undef,length(SpectraLibrary))
+		for i in eachindex(SpectraLibrary)
+			
+			# Calculate difference in materials and VCA extracted spectra.
+			diff[i] = norm(SpectraLibrary[i] - ObservedSpectra[j]) 
+			
+		end
+
+		# Find the closest match and store its index
+		index = findmin(diff)
+		if first(index) < 1
+			materialmatch[j] = last(index)
+		else
+			materialmatch[j] = 3
+		end
+		
+	end
+	return materialmatch
+end
+
+# ╔═╡ a9a58df3-d24b-48cc-841d-608053a6336c
+begin
+
+	# Scale and center the VCA extracted spectra
+	HypObs = map(x -> x/norm(x), map(x -> x .- minimum(x), [Model[1][:,i] for i =1:NoEM2Extract]))
+
+	# Below we load the entire spectral library as a dictionary
+	sm = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Samples.json")
+	sp = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Spectra.json")
+	
+	# Read the spectral library dictionary/load processed library
+	#MaterialSpec = SelectSpectra(sp)
+	#@save "/home/rnarwar/Desktop/EcoStressNumPy/SelectedSpectra.jld2" MaterialSpec
+	@load "/home/rnarwar/Desktop/EcoStressNumPy/SelectedSpectra.jld2"
+	MaterialSpec = last.(MaterialSpec)
+
+	# Scale and center the spectra
+	MaterialSpec = map(x -> x/norm(x), map(x -> x .- minimum(x), MaterialSpec))
+	
+	for i in eachindex(MaterialSpec)
+
+		# Remove inaccurate/unwanted spectra from library
+		if reduce(|, isnan.(MaterialSpec[i]))
+			MaterialSpec[i] .= 0
+		elseif (lowercase(get(sm[i] , "Type", 1)) == "mineral") || (lowercase(get(sm[i] , "Type", 1)) == "rock")
+			MaterialSpec[i] .= 0
+		end
+		
+	end
+		
+	materialmatch = FindMaterial(HypObs, MaterialSpec)
+end
+
+# ╔═╡ 2bde76cc-f998-431b-80e1-426f590b8171
+begin
+	@info lowercase(get(sm[materialmatch[n]], "Type", 1));
+	plot(HypObs[n],label="EM Capured $n");
+	plot!(MaterialSpec[materialmatch[n]],label=get(sm[materialmatch[n]], "Name", 1))
+end
+
+# ╔═╡ 4cf55b27-9af1-416d-b8f6-3d9b7e0aa6ed
+let x = map(norm, [HypObs - MaterialSpec[materialmatch]]...)
+	@info x;
+	plot(x;
+	title = "Difference in measured and match spectra",
+	titlefontsize=90,
+	axis=false, 
+legend=false, 
+ticks=false, 
+thickness_scaling=0.1, 
+ms= 30,
+lw = 10, 
+size=(300,300))
+end
+
 # ╔═╡ 1515fcc7-8cc3-4e76-91df-3da892baebab
 function BandMatch(x::Vector{Float32})::Vector{Int32}
 	CorresBand = Vector{Int32}(undef, length(SelectedBands))
 	for i in eachindex(SelectedBands)
 		Band = findmin(abs.(x .- SelectedBands[i]))
-		if first(Band) < 0.01
+		if first(Band) < 0.002
 			CorresBand[i] = last(Band)
 		else
 			return ones(length(SelectedBands))
@@ -397,87 +336,9 @@ function SelectSpectra(sp)
 		
 		CBand = BandMatch(x)
 		Spectra[sno] = [x[CBand],y[CBand]]
-		Spectra[sno] = [x,y]
+		#Spectra[sno] = [x,y]
 	end
 	return Spectra
-end
-
-# ╔═╡ 25476048-94e9-4b3f-9fa7-a8699d95ec63
-begin
-
-	# Scale and center the VCA extracted spectra
-	HypObs = map(x -> x/norm(x), map(x -> x .- minimum(x), [Model[1][:,i] for i =1:NoEM2Extract]))
-
-	# Below we load the entire spectral library as a dictionary
-	sm = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Samples.json")
-	sp = JSON.parsefile("/home/rnarwar/Desktop/EcoStressNumPy/Spectra.json")
-	
-	# Read the spectral library dictionary/load processed library
-	#MaterialSpec = SelectSpectra(sp)
-	@load "/home/rnarwar/Desktop/EcoStressNumPy/SelectedSpectra.jld2"
-	MaterialSpec = last.(MaterialSpec)
-
-	# Scale and center the spectra
-	MaterialSpec = map(x -> x/norm(x), map(x -> x .- minimum(x), MaterialSpec))
-	
-	for i in eachindex(MaterialSpec)
-
-		# Remove inaccurate/unwanted spectra from library
-		if reduce(|, isnan.(MaterialSpec[i]))
-			MaterialSpec[i] .= 0
-		"""elseif (lowercase(get(sm[i] , "Type", 1)) == "mineral") || lowercase(get(sm[i] , "Type", 1)) == "rock"
-			MaterialSpec[i] .= 0"""
-		end
-		
-	end
-end
-
-# ╔═╡ a9a58df3-d24b-48cc-841d-608053a6336c
-begin
-	materialmatch = Vector{Int32}(undef,NoEM2Extract)
-
-	for j in eachindex(HypObs)
-		
-		diff = Vector{Float32}(undef,length(MaterialSpec))
-		for i in eachindex(MaterialSpec)
-			
-			# Calculate difference in materials and VCA extracted spectra.
-			diff[i] = norm(MaterialSpec[i] - HypObs[j]) 
-			
-		end
-
-		# Find the closest match and store its index
-		index = findmin(diff)
-		if first(index) < 1
-			materialmatch[j] = last(index)
-		else
-			materialmatch[j] = 3
-		end
-		
-	end
-end
-
-# ╔═╡ 2bde76cc-f998-431b-80e1-426f590b8171
-begin
-	@info lowercase(get(sm[materialmatch[n]], "Type", 1));
-	plot(HypObs[n],label="EM Capured $n");
-	plot!(MaterialSpec[materialmatch[n]],label=get(sm[materialmatch[n]], "Name", 1))
-end
-
-# ╔═╡ 1451bd29-fb4b-4563-b629-3c9ee47c810f
-begin
-	println("Difference in measured and match spectra");
-	
-	plot(map(norm,[HypObs[i] - MaterialSpec[materialmatch[i]] for i=1:length(HypObs)]);
-
-series_annontation = text.(1:length(HypObs), :bottom), 
-axis=false, 
-legend=false, 
-ticks=false, 
-thickness_scaling=0.1, 
-ms= 30,
-lw = 10, 
-size=(300,300))
 end
 
 # ╔═╡ 692bd5fa-cc6f-4483-94c5-80ebfddd3422
@@ -526,24 +387,35 @@ function SparseArrays.sparse(Index::Vector{CartesianIndex},Data::Vector)::Sparse
 	return sparse(I, J, Data)
 end
 
+# ╔═╡ 6f623019-619f-4cb9-bf59-f0703e282bc4
+function Conv2Image(Data::Matrix{pType},
+                    Index::Vector{CartesianIndex},
+                    save = false) where pType <: Union{Float32,Float64}
+
+    P = Vector{Matrix{pType}}(undef,size(Data,2)) # Abundance map of EMs
+    for i in 1:size(Data,2)
+        Ar = map(clamp01nan,sparse(Index, Data[:,i])) # clamp to ignore -ve
+        P[i] = Ar
+    end
+
+    Fig = Vector{Matrix{RGB{pType}}}(undef, length(eachindex(P)[1:3:end-2]))
+    for i in eachindex(P)[1:3:end-2]
+        Fig[(i+2)÷3] = RGB.(P[i], P[i+1], P[i+2]) # 3 EMs abundance in one image
+    end
+
+    if save
+        for i in eachindex(Fig)
+            save("/home/rnarwar/Desktop/PlotsOut/VCA10dim/RGB$i.png", Fig[i])
+        end
+    end
+	return P, Fig
+end
+
 # ╔═╡ 515f63b3-f3bd-4ed9-9529-de98b83a298f
 begin
-	Data = (pinv(Model[1])*Model[3])' # Converting pixels into EM weights
-	
-	P = Vector{Matrix{Float64}}(undef,size(Data,2)) # Abundance map of EMs
-	for i in 1:size(Data,2)
-		Ar = map(clamp01nan,sparse(Index, Data[:,i])) # clamp to ignore -ve
-		P[i] = Ar
-	end
-	
-	Fig = Vector{Matrix{RGB{Float64}}}(undef, length(eachindex(P)[1:3:end-2]))
-	for i in eachindex(P)[1:3:end-2]
-		Fig[(i+2)÷3] = RGB.(P[i], P[i+1], P[i+2]) # 3 EMs abundance in one image
-	end
-
-	for i in eachindex(Fig)
-	#save("/home/rnarwar/Desktop/PlotsOut/VCA10dim/RGB$i.png", Fig[i])
-	end
+	Data = permutedims(pinv(Model[1])*Model[3]); # Converting pixels into EM weights
+	P, Fig = Conv2Image(Data,Index);
+	nothing
 end
 
 # ╔═╡ b135e9fa-6623-49b8-84d6-f866ed762e99
@@ -665,18 +537,22 @@ md"""
 # ╔═╡ e6d7074d-2b20-415c-8005-31ec6b0387d7
 # ╠═╡ disabled = true
 #=╠═╡
-begin
+"""begin
 	Y = X
-	R = 10
-	SNRin = 0
+	R = 3
+	SNRin = 0.1
+	
 	L,N, = size(Y)
-
 	ym = mean(Y, dims=2)
 	Yo = Y .- ym
 	Ud = svd((Yo*Yo')/N).U[:,begin:R] #randn(2000,2)/10
 	xp = Ud'*Yo
 
-	SNR = SNRcalc(Y, ym, xp)
+	if SNRin == 0.0
+		SNR = SNRcalc(Y, ym, xp)
+	else
+		SNR = SNRin
+	end
 
 	SNRth = 15 + 10*log10(R)
 
@@ -708,12 +584,12 @@ begin
 
 		x = Ud'* Y
 		u = mean(x, dims=2)
-		y = x/(u'*x)
+		y = x./(u'*x)
 	end
 
 	indice = zeros(Int,R)
 	A = zeros(R,R)
-	A[end,begin] = 1
+	A[begin,begin] = 1
 	
 	for i=1:R
 		w = rand(R,1)
@@ -727,7 +603,7 @@ begin
 	end
 
 	Ae = Yp[:,indice]
-end
+end"""
   ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -2194,41 +2070,33 @@ version = "0.9.1+5"
 # ╟─e4305ce2-6a7a-4091-b209-d794f6d8dc56
 # ╟─08fc6aaf-5894-4bee-baaf-f24d10752173
 # ╟─e626b16c-2a51-4ecb-aa85-852e34614181
-# ╟─4b856878-3f2a-434e-8920-9c3178bdff40
-# ╟─675bd5db-35ee-4f07-a736-f566e55d9026
-# ╟─98b6110f-0d85-4949-825d-334f429d8eb9
 # ╟─8272fcc9-2118-4088-b339-571a231f49a3
 # ╟─64feecf9-5231-404e-9346-0cc0548dc356
 # ╟─91dc3a4b-01f5-4959-9ef8-ea0895e3b765
-# ╟─c3e5a89c-1994-48b2-95bd-4a08b6c43c30
-# ╟─6f2ee555-bfee-4caf-8ef5-bdabf924b888
-# ╟─0eca535c-9779-49a1-90b3-a79247e62de5
 # ╟─da3c2c91-2b67-44a6-aa7b-86819d941367
 # ╟─8c810275-ea32-44c4-9bfb-20108f861159
 # ╟─853edae3-22ba-4fe6-818a-34a5ac005675
 # ╟─fce4a1d4-dc42-48ca-886c-37af467e870e
-# ╟─7cde3546-5913-46ed-a044-3f9cc7177cee
-# ╟─af3de22f-4801-432a-9329-832a851ad176
-# ╟─4262fd8d-dca8-4ea9-8850-caed586da9d2
+# ╠═40ed31f5-27d6-4481-9fc5-f74e5083a85c
 # ╟─c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
-# ╟─1c659856-b4f1-450f-a452-79756c7856dc
-# ╟─99cf8901-2fd2-4011-bc44-d5528ee876a0
+# ╠═1c659856-b4f1-450f-a452-79756c7856dc
 # ╟─0a81aa25-a572-4223-b7d0-5f12f333b360
 # ╟─2bde76cc-f998-431b-80e1-426f590b8171
 # ╟─8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
-# ╟─1451bd29-fb4b-4563-b629-3c9ee47c810f
-# ╠═a9a58df3-d24b-48cc-841d-608053a6336c
+# ╟─4cf55b27-9af1-416d-b8f6-3d9b7e0aa6ed
+# ╟─a9a58df3-d24b-48cc-841d-608053a6336c
+# ╟─cc12e04d-52c1-475b-8b7c-e3f712569488
 # ╟─67b54389-bb16-4aff-ac9c-a0af1b6862ea
 # ╟─1515fcc7-8cc3-4e76-91df-3da892baebab
-# ╟─25476048-94e9-4b3f-9fa7-a8699d95ec63
 # ╟─692bd5fa-cc6f-4483-94c5-80ebfddd3422
+# ╟─515f63b3-f3bd-4ed9-9529-de98b83a298f
+# ╟─6f623019-619f-4cb9-bf59-f0703e282bc4
 # ╟─b135e9fa-6623-49b8-84d6-f866ed762e99
 # ╟─4be606c7-7f79-4155-99ab-f5aca921c3ef
+# ╟─e384162c-89f5-4d68-b126-670f802d3152
 # ╟─90feaea7-ecd4-4e5b-9b55-c47a8b8754e0
 # ╟─885cd7d4-7b83-40e8-8248-8a8b8a854e9f
-# ╟─e384162c-89f5-4d68-b126-670f802d3152
 # ╟─6b7bc7ea-19bb-4195-bf59-13290464f2b4
-# ╟─515f63b3-f3bd-4ed9-9529-de98b83a298f
 # ╟─2f671849-a72d-4c54-b977-afa32a0f035c
 # ╟─735fd6e2-21ce-499a-a3ce-f47bb31402d9
 # ╟─71261f87-c992-441b-a172-163b832e19c2
