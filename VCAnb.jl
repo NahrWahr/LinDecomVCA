@@ -221,7 +221,17 @@ end
 begin
 	global NoEM2Extract = 9
 	Model = VCA(X/1.0f0, NoEM2Extract, 0.0);
-	plot(SelectedBands,Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
+	plot(Model[1][:,:], shape=:circle, mc=:red, ms=:3, size=(1920,1080))
+end
+
+# ╔═╡ 782b91cf-401b-4dff-9294-d5d8a64b5d33
+begin
+	@load "/home/rnarwar/Gits/TestData/FlatDownscaledImage.jld2"
+	FlatDownscaledHyperionImage = permutedims(FlatDownscaledHyperionImage)[1:136,:]
+	ModelTest = VCA(FlatDownscaledHyperionImage, NoEM2Extract, 0.1)
+	HypObs2 = map(x -> x/norm(x), map(x -> x .- minimum(x), [ModelTest[1][:,i] for i =1:NoEM2Extract]));
+
+	plot(HypObs2, shape=:circle, mc=:red, ms=:3, size=(1920,1080))
 end
 
 # ╔═╡ 0a81aa25-a572-4223-b7d0-5f12f333b360
@@ -2077,9 +2087,10 @@ version = "0.9.1+5"
 # ╟─8c810275-ea32-44c4-9bfb-20108f861159
 # ╟─853edae3-22ba-4fe6-818a-34a5ac005675
 # ╟─fce4a1d4-dc42-48ca-886c-37af467e870e
-# ╠═40ed31f5-27d6-4481-9fc5-f74e5083a85c
+# ╟─40ed31f5-27d6-4481-9fc5-f74e5083a85c
 # ╟─c9894ac9-1e29-4cb5-b3c4-c949b6b7e6c8
-# ╠═1c659856-b4f1-450f-a452-79756c7856dc
+# ╟─782b91cf-401b-4dff-9294-d5d8a64b5d33
+# ╟─1c659856-b4f1-450f-a452-79756c7856dc
 # ╟─0a81aa25-a572-4223-b7d0-5f12f333b360
 # ╟─2bde76cc-f998-431b-80e1-426f590b8171
 # ╟─8eed128c-69d9-4fd6-8ed7-8ae9eed84de3
